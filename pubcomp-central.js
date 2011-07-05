@@ -7,6 +7,8 @@ var server = net.createServer();
 server.on( 'connection', handleConnection );
 server.listen( config.port );
 
+var servers = {};
+
 function handleConnection( socket ) {
 	if ( config.allowedAddresses.indexOf( socket.remoteAddress ) == -1 ) {
 		console.log( 'Invalid connection from ' + socket.remoteAddress );
@@ -47,6 +49,20 @@ function write( data, socket ) {
 	socket.write( JSON.stringify( data ) + '\0' );
 }
 
+function updateState( type, data, ip ) {
+	if ( !( ip in servers ) || servers[ip].type != type ) {
+		servers[ip] = {
+			type: type,
+			data: data
+		};
+		return;
+	}
+	if ( 'data' in data && 'data' in servers[ip] ) {
+		data.data = servers[ip].data + data.data;
+	}
+	servers[ip].data = data;
+}
+
 function processMessage( data, socket ) {
 	switch ( data.type ) {
 		case 'hello':
@@ -56,6 +72,9 @@ function processMessage( data, socket ) {
 			} else {
 				write( { type: 'hello', version: VERSION }, socket );
 			}
+			break;
+		case 'tfdsUpdate':
+			updateState( 'update', data, socket.remoteAddress );
 			break;
 		default:
 			console.log( 'Got unknown message type ' + data.type );
